@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Caddy - Reverse Proxy with Auto HTTPS
+  caddy:
+    image: caddy:2-alpine
+    container_name: busbd-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./client/dist:/srv/client:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      - node-app
+    networks:
+      - busbd-network
+
+  # Node.js Application
+  node-app:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: busbd-api
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGO_URI=mongodb://mongo:27017/busbd
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - CLIENT_URL=https://busbd-clone.com
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - busbd-network
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:3000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Database
+  mongo:
+    image: mongo:7
+    container_name: busbd-mongo
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=busbd
+    volumes:
+      - mongo_data:/data/db
+      - ./infra/mongo-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - busbd-network
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: busbd-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - busbd-network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mongo_data:
+    driver: local
+  redis_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+  caddy_logs:
+    driver: local
+
+networks:
+  busbd-network:
+    driver: bridge

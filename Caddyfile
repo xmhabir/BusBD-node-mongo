@@ -1,0 +1,120 @@
+# Caddyfile - Production Configuration for BusBD-Clone
+# Automatic HTTPS with Let's Encrypt
+
+{
+    # Global options
+    email admin@busbd-clone.com
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+    
+    # Enable HTTP/3
+    servers {
+        protocol {
+            experimental_http3
+        }
+    }
+}
+
+# Main domain configuration
+busbd-clone.com {
+    # Enable compression (Gzip and Zstd)
+    encode zstd gzip
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' wss: ws:;"
+        -Server
+    }
+
+    # API reverse proxy - Route /api/* to Node.js container
+    handle /api/* {
+        reverse_proxy node-app:3000 {
+            # Health checks
+            health_uri /health
+            health_interval 30s
+            health_timeout 5s
+            
+            # Load balancing headers
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # WebSocket reverse proxy - Route /socket.io/* to Node.js container
+    # Caddy automatically handles WebSocket upgrade headers
+    handle /socket.io/* {
+        reverse_proxy node-app:3000 {
+            # WebSocket requires persistent connections
+            transport http {
+                keepalive 30s
+                keepalive_idle_conns 10
+            }
+            
+            # Sticky sessions for Socket.io polling fallback
+            lb_policy cookie
+        }
+    }
+
+    # Admin metrics endpoint - Protected with Basic Auth
+    handle /admin/metrics {
+        basicauth {
+            # Generate hash: caddy hash-password
+            # Default: admin / BusBD@Admin2024!
+            admin $2a$14$DKz7qGhQg3kIJwY7c9W5AeZzN1XJwZ1LmN5QwZ7k9W5AeZzN1XJwZ
+        }
+        reverse_proxy node-app:3000/internal/metrics
+    }
+
+    # React SPA - Serve static files for root path
+    handle {
+        root * /srv/client
+        
+        # Try files logic for SPA routing
+        # If file exists, serve it; otherwise serve index.html
+        try_files {path} /index.html
+        
+        file_server {
+            # Enable pre-compressed files if available
+            precompressed gzip br
+        }
+    }
+
+    # Access logging in JSON format
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 100mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
+    }
+}
+
+# Redirect www to non-www
+www.busbd-clone.com {
+    redir https://busbd-clone.com{uri} permanent
+}
+
+# Development configuration (optional - use for local testing)
+# Uncomment and modify for local development
+# :80 {
+#     encode gzip
+#     
+#     handle /api/* {
+#         reverse_proxy localhost:3000
+#     }
+#     
+#     handle /socket.io/* {
+#         reverse_proxy localhost:3000
+#     }
+#     
+#     handle {
+#         root * ./client/dist
+#         try_files {path} /index.html
+#         file_server
+#     }
+# }

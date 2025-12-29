@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 224 71% 98%;
+    /* Soft cool white */
+    --foreground: 263 60% 10%;
+    /* Deep violet-black */
+
+    --card: 0 0% 100%;
+    --card-foreground: 263 60% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 263 60% 10%;
+
+    --primary: 267 100% 61%;
+    /* Electric Violet */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 260 20% 96%;
+    /* Very pale violet */
+    --secondary-foreground: 263 40% 20%;
+
+    --muted: 260 20% 96%;
+    --muted-foreground: 263 10% 45%;
+
+    --accent: 260 20% 96%;
+    --accent-foreground: 263 40% 20%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 263 20% 92%;
+    --input: 263 20% 92%;
+    --ring: 267 100% 61%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 265 40% 5%;
+    /* Deep space violet-black */
+    --foreground: 210 40% 98%;
+
+    --card: 265 40% 8%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 265 40% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 267 100% 67%;
+    /* Lighter electric violet */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 265 30% 15%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 265 30% 15%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 265 30% 15%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 265 30% 15%;
+    --input: 265 30% 15%;
+    --ring: 267 100% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+
+  /* ... Custom Components ... */
+  .seat {
+    @apply w-16 h-16 rounded-t-2xl rounded-b-md flex items-center justify-center text-xs font-bold transition-all duration-300 shadow-md border-b-4 mx-1;
+  }
+
+  .seat-available {
+    @apply bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-primary/5 hover:text-primary hover:-translate-y-1;
+  }
+
+  .seat-locked {
+    @apply bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600 border-yellow-400 cursor-not-allowed animate-pulse shadow-yellow-500/20;
+  }
+
+  .seat-booked {
+    @apply bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 border-yellow-400 dark:border-yellow-700 cursor-pointer hover:border-yellow-500;
+  }
+
+  .seat-sold-mine {
+    @apply bg-red-100 dark:bg-red-900/40 text-red-600 border-red-400 dark:border-red-700 cursor-not-allowed font-bold;
+  }
+
+  .seat-sold-other {
+    @apply bg-purple-100 dark:bg-purple-900/40 text-purple-600 border-purple-400 dark:border-purple-700 cursor-not-allowed opacity-80;
+  }
+
+  .seat-selected {
+    @apply bg-primary text-white border-violet-800 ring-2 ring-primary/30 ring-offset-2 ring-offset-background scale-105 shadow-lg shadow-primary/30;
+  }
+
+  .seat-aisle {
+    @apply w-10 bg-transparent cursor-default;
+  }
+
+  .glass-card {
+    @apply bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-xl;
+  }
+
+  .gradient-primary {
+    @apply bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white shadow-lg shadow-violet-500/25;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50;
+}
+
+/* NProgress Customization */
+#nprogress .bar {
+  background: hsl(var(--primary)) !important;
+  height: 3px !important;
+}
+
+#nprogress .peg {
+  box-shadow: 0 0 10px hsl(var(--primary)), 0 0 5px hsl(var(--primary)) !important;
+}
+
+#nprogress .spinner-icon {
+  border-top-color: hsl(var(--primary)) !important;
+  border-left-color: hsl(var(--primary)) !important;
+}
