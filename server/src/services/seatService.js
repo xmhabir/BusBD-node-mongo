@@ -188,49 +188,64 @@ async function releaseExpiredLocks(expiryMinutes = 10) {
     const now = new Date();
     const lockExpiryTime = new Date(now.getTime() - expiryMinutes * 60 * 1000);
 
-    // Release locks
-    const lockResult = await TripSchedule.updateMany(
-        {
-            'seats.status': 'locked',
-            'seats.lockedAt': { $lt: lockExpiryTime }
-        },
-        {
-            $set: {
-                'seats.$[elem].status': 'available',
-                'seats.$[elem].lockedBy': null,
-                'seats.$[elem].lockedAt': null,
-                'seats.$[elem].bookingId': null
-            }
-        },
-        {
-            arrayFilters: [
-                { 'elem.status': 'locked', 'elem.lockedAt': { $lt: lockExpiryTime } }
-            ]
-        }
-    );
+    // 1. Find all trips that HAVE expired locks or bookings
+    const affectedTrips = await TripSchedule.find({
+        $or: [
+            { 'seats.status': 'locked', 'seats.lockedAt': { $lt: lockExpiryTime } },
+            { 'seats.status': 'booked', 'seats.bookingExpiry': { $lt: now, $ne: null } }
+        ]
+    }).select('_id seats');
 
-    // Release expired bookings (reserved seats)
-    const bookingResult = await TripSchedule.updateMany(
-        {
-            'seats.status': 'booked',
-            'seats.bookingExpiry': { $lt: now, $ne: null }
-        },
-        {
-            $set: {
-                'seats.$[elem].status': 'available',
-                'seats.$[elem].bookedBy': null,
-                'seats.$[elem].bookingId': null,
-                'seats.$[elem].bookingExpiry': null
-            }
-        },
-        {
-            arrayFilters: [
-                { 'elem.status': 'booked', 'elem.bookingExpiry': { $lt: now, $ne: null } }
-            ]
-        }
-    );
+    if (affectedTrips.length === 0) return [];
 
-    return (lockResult.modifiedCount || 0) + (bookingResult.modifiedCount || 0);
+    const releasedData = [];
+
+    for (const trip of affectedTrips) {
+        const expiredLocks = trip.seats.filter(s =>
+            s.status === 'locked' && s.lockedAt < lockExpiryTime
+        ).map(s => s.seatNumber);
+
+        const expiredBookings = trip.seats.filter(s =>
+            s.status === 'booked' && s.bookingExpiry < now && s.bookingExpiry !== null
+        ).map(s => s.seatNumber);
+
+        const allExpired = [...new Set([...expiredLocks, ...expiredBookings])];
+
+        if (allExpired.length > 0) {
+            // Update this specific trip atomically
+            await TripSchedule.updateOne(
+                { _id: trip._id },
+                {
+                    $set: {
+                        'seats.$[elem].status': 'available',
+                        'seats.$[elem].lockedBy': null,
+                        'seats.$[elem].lockedAt': null,
+                        'seats.$[elem].bookedBy': null,
+                        'seats.$[elem].bookingId': null,
+                        'seats.$[elem].bookingExpiry': null
+                    },
+                    $inc: { availableSeats: allExpired.length }
+                },
+                {
+                    arrayFilters: [
+                        {
+                            $or: [
+                                { 'elem.status': 'locked', 'elem.lockedAt': { $lt: lockExpiryTime } },
+                                { 'elem.status': 'booked', 'elem.bookingExpiry': { $lt: now, $ne: null } }
+                            ]
+                        }
+                    ]
+                }
+            );
+
+            releasedData.push({
+                tripId: trip._id.toString(),
+                seatNumbers: allExpired
+            });
+        }
+    }
+
+    return releasedData;
 }
 
 /**

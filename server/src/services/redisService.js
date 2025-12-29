@@ -21,7 +21,7 @@ redis.on('error', (err) => {
     }
 });
 
-const LOCK_TTL_SECONDS = 600; // 10 minutes
+const LOCK_TTL_SECONDS = 30; // 30 seconds expiration
 
 function isRedisReady() {
     return redis.status === 'ready';

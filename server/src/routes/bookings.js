@@ -166,7 +166,10 @@ router.post('/', optionalAuth, [
 
         // Broadcast booking via socket
         if (req.io) {
-            req.io.to(`trip:${tripId}`).emit('seats_booked', { seatNumbers: seats });
+            req.io.to(`trip:${tripId}`).emit('seats_booked', {
+                seatNumbers: seats,
+                status: type === 'sell' ? 'sold' : 'booked'
+            });
         }
 
         res.status(201).json({

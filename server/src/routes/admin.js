@@ -593,7 +593,14 @@ router.post('/bookings/manage', async (req, res) => {
         // Notify socket
         if (req.io) {
             req.io.to(`trip:${trip._id}`).emit('seats_updated', { tripId: trip._id });
-            // Better to emit specific event, but polling/refresh logic might rely on this
+
+            // If it was a sale/conversion, also broadcast specific status for immediate UI color change
+            if (action === 'sell') {
+                req.io.to(`trip:${trip._id}`).emit('seats_booked', {
+                    seatNumbers: seatNumbers,
+                    status: 'sold'
+                });
+            }
         }
 
         res.json({

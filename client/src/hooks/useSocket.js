@@ -28,6 +28,7 @@ export function useTripSocket(tripId) {
     const { user, token } = useAuth();
     const [connected, setConnected] = useState(false);
     const [seatUpdates, setSeatUpdates] = useState([]);
+    const [lastGlobalUpdate, setLastGlobalUpdate] = useState(Date.now());
 
     // Manage Guest ID
     const [guestId] = useState(() => {
@@ -84,6 +85,10 @@ export function useTripSocket(tripId) {
             setSeatUpdates(prev => [...prev, { type: 'release_success', ...data }]);
         }
 
+        function onSeatsUpdated(data) {
+            setLastGlobalUpdate(Date.now());
+        }
+
         socketInstance.on('connect', onConnect);
         socketInstance.on('disconnect', onDisconnect);
 
@@ -99,6 +104,7 @@ export function useTripSocket(tripId) {
         socketInstance.on('seat_lock_success', onLockSuccess);
         socketInstance.on('seat_lock_failed', onLockFailed);
         socketInstance.on('seat_release_success', onReleaseSuccess);
+        socketInstance.on('seats_updated', onSeatsUpdated);
 
         return () => {
             if (tripId) {
@@ -113,6 +119,7 @@ export function useTripSocket(tripId) {
             socketInstance.off('seat_lock_success', onLockSuccess);
             socketInstance.off('seat_lock_failed', onLockFailed);
             socketInstance.off('seat_release_success', onReleaseSuccess);
+            socketInstance.off('seats_updated', onSeatsUpdated);
 
             // Do NOT disconnect the socket, just leave the room.
             // This prevents race conditions where emit is cancelled by disconnect.
@@ -145,6 +152,7 @@ export function useTripSocket(tripId) {
         releaseSeat,
         extendLock,
         clearUpdates,
-        userId: socketUserId
+        userId: socketUserId,
+        lastGlobalUpdate
     };
 }

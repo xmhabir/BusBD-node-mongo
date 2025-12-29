@@ -1,7 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const { lockSeatInRedis, unlockSeatInRedis, extendLock, LOCK_TTL_SECONDS } = require('../services/redisService');
-const { atomicLockSeat, atomicUnlockSeat } = require('../services/seatService');
+const { atomicLockSeat, atomicUnlockSeat, releaseExpiredLocks } = require('../services/seatService');
 
 function initializeSocket(httpServer) {
     const io = new Server(httpServer, {
@@ -111,7 +111,7 @@ function initializeSocket(httpServer) {
                 socket.emit('seat_lock_success', {
                     seatNumber,
                     expiresIn: LOCK_TTL_SECONDS,
-                    message: `Seat ${seatNumber} locked for ${LOCK_TTL_SECONDS / 60} minutes`
+                    message: `Seat ${seatNumber} locked for 30 seconds`
                 });
 
                 console.log(`🔒 Seat ${seatNumber} locked by user ${userId} on trip ${tripId}`);
@@ -191,9 +191,10 @@ function initializeSocket(httpServer) {
         });
 
         // SEAT BOOKED - Notify all users when booking is confirmed
-        socket.on('seat_booked', ({ tripId, seatNumbers }) => {
+        socket.on('seat_booked', ({ tripId, seatNumbers, status = 'booked' }) => {
             io.to(`trip:${tripId}`).emit('seats_booked', {
                 seatNumbers,
+                status,
                 bookedBy: socket.user ? socket.user.id : 'system'
             });
         });
@@ -208,6 +209,31 @@ function initializeSocket(httpServer) {
             console.error(`Socket error for user ${socket.user ? socket.user.id : 'Guest'}:`, error);
         });
     });
+
+    // Background Cleanup Job: Every 10 seconds, clear locks older than 30 seconds
+    setInterval(async () => {
+        try {
+            // expiryMinutes = 30 / 60 = 0.5
+            const releasedTrips = await releaseExpiredLocks(0.5);
+
+            for (const { tripId, seatNumbers } of releasedTrips) {
+                console.log(`🧹 Cleanup: Released ${seatNumbers.length} seats on trip ${tripId}`);
+
+                // Notify everyone in this trip room about the unlocked seats
+                seatNumbers.forEach(seatNumber => {
+                    io.to(`trip:${tripId}`).emit('seat_unlocked', {
+                        seatNumber,
+                        releasedBy: 'system' // System cleanup
+                    });
+                });
+
+                // Also trigger a global refresh for this specific trip
+                io.to(`trip:${tripId}`).emit('seats_updated', { tripId });
+            }
+        } catch (error) {
+            console.error('Cleanup job error:', error);
+        }
+    }, 10000);
 
     return io;
 }

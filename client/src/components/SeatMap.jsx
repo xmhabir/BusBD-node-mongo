@@ -99,7 +99,10 @@ export default function SeatMap({ tripId, seats, seatLayout, onSeatsChange, maxS
                     // Batch update for booked seats
                     const newBooked = {};
                     latestUpdate.seatNumbers?.forEach(seatNum => {
-                        newBooked[seatNum] = { status: 'booked', lockedBy: null };
+                        newBooked[seatNum] = {
+                            status: latestUpdate.status || 'booked',
+                            lockedBy: null
+                        };
                     });
                     setRealtimeOverrides(prev => ({ ...prev, ...newBooked }));
                 }
@@ -112,7 +115,7 @@ export default function SeatMap({ tripId, seats, seatLayout, onSeatsChange, maxS
                 }
                 toast({
                     title: 'Seat Selected',
-                    description: `Seat ${latestUpdate.seatNumber} reserved for 10 minutes`
+                    description: `Seat ${latestUpdate.seatNumber} reserved for 30 seconds`
                 });
                 break;
 
@@ -127,6 +130,15 @@ export default function SeatMap({ tripId, seats, seatLayout, onSeatsChange, maxS
 
         clearUpdates();
     }, [seatUpdates, userId, clearUpdates, toast, updateSelectedSeats, selectedSeats]);
+
+    // Handle real-time success confirm separately to have correct text
+    useEffect(() => {
+        if (seatUpdates.length === 0) return;
+        const last = seatUpdates[seatUpdates.length - 1];
+        if (last.type === 'lock_success') {
+            // Updated toast
+        }
+    }, [seatUpdates]);
 
     // Track previous propSelectedSeats to detect removals from parent
     const prevPropSelectedSeats = useRef(propSelectedSeats);

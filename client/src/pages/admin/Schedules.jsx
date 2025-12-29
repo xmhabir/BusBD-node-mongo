@@ -264,7 +264,31 @@ export default function AdminSchedules() {
 
     // Sheet State
     const [selectedSchedule, setSelectedSchedule] = useState(null);
-    const { connected } = useTripSocket(selectedSchedule?._id);
+    const { connected, lastGlobalUpdate } = useTripSocket(selectedSchedule?._id);
+
+    // REAL-TIME SYNC: Refresh data when global updates occur
+    useEffect(() => {
+        if (lastGlobalUpdate) {
+            // 1. Refresh the sidebar list (seat counts)
+            handleSearch();
+
+            // 2. Refresh the selected schedule details (seat map)
+            if (selectedSchedule) {
+                const refreshCurrent = async () => {
+                    try {
+                        const { tripApi } = await import('@/services/api');
+                        const response = await tripApi.getById(selectedSchedule._id);
+                        if (response.data?.trip) {
+                            setSelectedSchedule(response.data.trip);
+                        }
+                    } catch (error) {
+                        console.error("Real-time refresh failed:", error);
+                    }
+                };
+                refreshCurrent();
+            }
+        }
+    }, [lastGlobalUpdate, selectedSchedule?._id]); // Depend on lastGlobalUpdate
 
     // Store Integration for Persistence
     const selections = useBookingStore(state => state.selections);
